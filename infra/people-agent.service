@@ -1,0 +1,21 @@
+[Unit]
+Description=People provisioning agent
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/people-agent
+EnvironmentFile=/etc/people-agent/people-agent.env
+ExecStart=/opt/people-agent/people-agent
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+ReadWritePaths=/home
+
+[Install]
+WantedBy=multi-user.target
