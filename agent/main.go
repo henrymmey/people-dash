@@ -42,7 +42,7 @@ type keyRequest struct {
 
 var (
 	validUser = regexp.MustCompile(`^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$`)
-	validKey  = regexp.MustCompile(`^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp256|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\\.com)\\s+[^\\s]+(?:\\s+.*)?$`)
+	validKey  = regexp.MustCompile(`^(ssh-(ed25519|rsa)|ecdsa-sha2-nistp256|sk-(ssh-ed25519|ecdsa-sha2-nistp256)@openssh\.com)\s+[^\s]+(?:\s+.*)?$`)
 )
 
 func main() {
