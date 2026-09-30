@@ -1,12 +1,13 @@
 <?php
 
-namespace AppHttpControllers;
+namespace App\Http\Controllers;
 
-use AppModelsUser;
-use AppServicesOidcService;
-use AppServicesProvisioningService;
-use IlluminateHttpRedirectResponse;
-use IlluminateSupportStr;
+use App\Models\User;
+use App\Services\OidcService;
+use App\Services\ProvisioningService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Throwable;
 
 class AuthController extends Controller
@@ -76,14 +77,14 @@ class AuthController extends Controller
 
             return redirect()->route('home')->with(
                 'error',
-                $e instanceof SymfonyComponentHttpKernelExceptionHttpExceptionInterface
+                $e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface
                     ? $e->getMessage()
                     : 'Login failed. Check the dashboard logs.',
             );
         }
     }
 
-    public function logout(IlluminateHttpRequest $request): RedirectResponse
+    public function logout(Request $request): RedirectResponse
     {
         $request->session()->invalidate();
         $request->session()->regenerateToken();
