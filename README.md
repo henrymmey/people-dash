@@ -1,72 +1,145 @@
 # People Dash
 
-Self-hosted people-style web hosting dashboard for the planned Meyerwolke/People infrastructure.
+Self-hosted, Authentik-backed People-style web hosting for a Proxmox home lab.
 
-## What it does
-
-People Dash lets an Authentik user sign in with OIDC and, on first successful login, automatically provisions a normal Linux account on a dedicated People LXC. The user can then manage SSH public keys and see the website/SSH details for that account.
-
-The website model is intentionally simple:
+People Dash gives a user a normal Linux account and static web space after their first successful Authentik login:
 
 ```text
 https://henry.p.meyerbrief.de/
-        -> /home/henry/public_html/
+        ->
+/home/henry/public_html/
 ```
 
-SSH is equally simple:
+SSH:
 
 ```text
 ssh henry@ssh.p.meyerbrief.de
 ```
 
-## Planned infrastructure
-
-| Component | Address | Role |
-|---|---|---|
-| NGINX Proxy Manager | `192.168.176.101` | Public HTTP(S) reverse proxy |
-| Authentik | `192.168.176.102` / `auth.meyerwolke.de` | Identity provider |
-| People Dashboard | `192.168.176.117` / `p.meyerbrief.de` | Laravel application |
-| People Host | `192.168.176.118` | SSH, Nginx, Linux users and provisioning |
-
-No LDAP is required.
-
-## Repository
+## Architecture
 
 ```text
-.
-├── agent/                         Go provisioning agent
-├── app/                           Laravel application
-├── bootstrap/                     Laravel bootstrap
-├── config/                       Laravel configuration
-├── database/migrations/           PostgreSQL schema
-├── docs/                          Architecture, installation and security
-├── infra/                         Nginx/systemd examples
-├── resources/views/               Dashboard UI
-└── routes/                        HTTP/console routes
+                         Internet
+                            |
+                            v
+                 NGINX Proxy Manager
+                  192.168.176.101
+                     /        \\
+                    /          \\
+                   v            v
+        p.meyerbrief.de      *.p.meyerbrief.de
+              |                     |
+              v                     v
+     People Dashboard         People Host
+      192.168.176.117        192.168.176.118
+       Laravel + DB          Nginx + SSH
+              |               + Go agent
+              |
+              v
+     Authentik / OIDC
+     auth.meyerwolke.de
+     192.168.176.102
 ```
 
-## Security architecture
+The design deliberately has no LDAP dependency.
 
-The dashboard never gets arbitrary root access. It calls a small Go API on the People Host. That API exposes only fixed operations such as creating a user and adding/removing an SSH public key. The API is protected by a bearer token and must be reachable only from the dashboard LXC.
+## Components
 
-Auth is handled by Authentik. The dashboard stores the stable OIDC `sub`, not a password. Linux accounts are created only after the first successful People Dashboard login and People-group membership check.
+| Component | Address | Responsibility |
+|---|---:|---|
+| NGINX Proxy Manager | `192.168.176.101` | Public HTTP(S), TLS and routing |
+| Authentik | `192.168.176.102` | OIDC identity and groups |
+| People Dashboard | `192.168.176.117` | Laravel UI, database and provisioning requests |
+| People Host | `192.168.176.118` | Linux users, SSH, static websites and Go agent |
 
-## Current implementation notes
+## Features
 
-This repository is a strong initial implementation, but it is not a claim that every host-specific hardening step is already complete. In particular, filesystem quotas need to be implemented/enabled at the storage layer, and the current dashboard suspension action is an administrative state rather than a complete SSH/web revocation. Read `docs/PEOPLE-HOST.md` and `docs/SECURITY.md` before exposing the service to untrusted users.
+- Authentik OIDC login
+- first-login Linux account provisioning
+- immutable People username
+- per-user static website at `https://<username>.p.meyerbrief.de`
+- SSH public-key management
+- storage-usage reporting
+- admin account list
+- real host-level suspend/resume
+- existing SSH session termination on suspend
+- provisioning audit trail
+- safe managed-account deletion
+- Debian 13 (Trixie) installation documentation
+- NPM, DNS and router setup documentation
+- GitHub Actions CI
 
-## Getting started
+## Suspension semantics
 
-Read these in order:
+Suspend is a real access control operation. It creates a root-owned suspension marker, rebuilds `sshd` `DenyUsers`, validates and reloads SSH, terminates the user's existing sessions/processes, and makes People Nginx return HTTP 403. Laravel changes its database state only after the host operation succeeds.
 
-1. `docs/ARCHITECTURE.md`
-2. `docs/INSTALLATION.md`
-3. `docs/AUTHENTIK.md`
-4. `docs/PEOPLE-HOST.md`
-5. `docs/SECURITY.md`
+Resume removes the marker and the generated `DenyUsers` entry.
 
-For the Laravel app, use PHP 8.3+, Composer and PostgreSQL. Laravel 13 requires PHP 8.3 or newer.
+## Security boundary
 
-For the agent, build `agent/` with Go and install the resulting binary as `/opt/people-agent/people-agent`.
+The Laravel application never gets arbitrary root shell access. It calls the Go provisioning agent through an authenticated internal API. The agent exposes fixed account operations only.
 
-Never commit `.env`, OIDC client secrets or the agent token.
+The agent token is a credential and must never be committed.
+
+## Documentation
+
+Read in this order:
+
+1. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+2. [`PROXMOX.md`](PROXMOX.md)
+3. [`docs/DNS-AND-NETWORK.md`](docs/DNS-AND-NETWORK.md)
+4. [`docs/NPM.md`](docs/NPM.md)
+5. [`docs/AUTHENTIK.md`](docs/AUTHENTIK.md)
+6. [`docs/INSTALLATION.md`](docs/INSTALLATION.md)
+7. [`docs/POSTGRESQL.md`](docs/POSTGRESQL.md)
+8. [`docs/PEOPLE-HOST.md`](docs/PEOPLE-HOST.md)
+9. [`docs/SECURITY.md`](docs/SECURITY.md)
+10. [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+11. [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+12. [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)
+
+## Production network
+
+Router forwards:
+
+```text
+TCP 80  -> 192.168.176.101:80
+TCP 443 -> 192.168.176.101:443
+TCP 22  -> 192.168.176.118:22
+```
+
+Do not publish:
+
+```text
+192.168.176.101:81
+192.168.176.117:80
+192.168.176.118:80
+192.168.176.118:8080
+```
+
+## Runtime requirements
+
+Dashboard: Debian 13, PHP 8.4, PHP-FPM, Composer, PostgreSQL and Nginx.
+
+People Host: Debian 13, Nginx, OpenSSH, Go and ACL tools.
+
+## Development
+
+```bash
+cd agent
+gofmt -w .
+go vet ./...
+go test ./...
+```
+
+```bash
+composer install
+mkdir -p bootstrap/cache
+php artisan test
+```
+
+## Current scope
+
+Version 1 does not enforce per-user kernel disk quotas. It reports actual home-directory usage only.
+
+A hard quota should be implemented only after choosing a storage-specific quota design for the Proxmox environment.
