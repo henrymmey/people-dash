@@ -1,6 +1,7 @@
 [Unit]
 Description=People provisioning agent
-After=network.target
+After=network-online.target ssh.service
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -9,13 +10,15 @@ Group=root
 WorkingDirectory=/opt/people-agent
 EnvironmentFile=/etc/people-agent/people-agent.env
 ExecStart=/opt/people-agent/people-agent
+
 Restart=on-failure
 RestartSec=3
-NoNewPrivileges=false
+
 PrivateTmp=true
+NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=false
-ReadWritePaths=/home
+ReadWritePaths=/home /etc /var/lib/people-agent
 
 [Install]
 WantedBy=multi-user.target
