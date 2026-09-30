@@ -1,7 +1,7 @@
 <?php
 
-use IlluminateSupportFacadesFacade;
-use IlluminateSupportServiceProvider;
+use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\ServiceProvider;
 
 return [
     'name' => env('APP_NAME', 'People Dash'),
