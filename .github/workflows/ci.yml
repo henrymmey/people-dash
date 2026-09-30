@@ -45,5 +45,5 @@ jobs:
       - name: PHP syntax
         run: find app config database resources routes tests -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
-      - name: Laravel tests
-        run: php artisan test
+      - name: PHPUnit tests
+        run: vendor/bin/phpunit
